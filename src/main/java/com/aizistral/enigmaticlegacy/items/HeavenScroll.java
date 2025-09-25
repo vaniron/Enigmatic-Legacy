@@ -99,39 +99,40 @@ public class HeavenScroll extends ItemBaseCurio {
 		}
 	}
 
-	protected void handleFlight(Player player, boolean inRangeCheckedAndSucceeded) {
-		//don't check in range every tick as it is expensive. Particularly for multiple people.
-		//instead, check once per second, based on the player's tick count
-		//If we're here from fabulous scroll, we automatically know we can skip this
-		if (player.tickCount % 20 != 0)
-			return;
+    protected void handleFlight(Player player, boolean inRangeCheckedAndSucceeded) {
+        // Don't check in range every tick as it is expensive. Particularly for multiple people.
+        // Instead, check once per second, based on the player's tick count
+        // If we're here from fabulous scroll, we automatically know we can skip this
+        if (player.tickCount % 20 != 0)
+            return;
 
-		try {
-			if (this.canFly(player, inRangeCheckedAndSucceeded)) {
-				player.getAbilities().mayfly = true;
-				//since we're only updating once per 20 ticks, we can leave this here as we won't be spamming update packets
-				player.onUpdateAbilities();
-				//reduced from 100 down to 5, as we now only run this code once per second.
-				this.flyMap.put(player, 5);
-
-			} else if (this.flyMap.get(player) > 1) {
-				this.flyMap.put(player, this.flyMap.get(player)-1);
-			} else if (this.flyMap.get(player) == 1) {
-				if (!player.isCreative()) {
-					player.getAbilities().mayfly = false;
-					player.getAbilities().flying = false;
-					player.onUpdateAbilities();
-					player.addEffect(new MobEffectInstance(MobEffects.SLOW_FALLING, 200, 0, true, false));
-				}
-
-				this.flyMap.put(player, 0);
-			}
-
-		} catch (NullPointerException ex) {
-			ex.printStackTrace();
-			this.flyMap.put(player, 0);
-		}
-	}
+        try {
+            if (this.canFly(player, inRangeCheckedAndSucceeded)) {
+                player.getAbilities().mayfly = true;
+                // Since we're only updating once per 20 ticks, we can leave this here as we won't be spamming update packets
+                player.onUpdateAbilities();
+                // Reduced from 100 down to 5, as we now only run this code once per second.
+                this.flyMap.put(player, 5);
+            } else {
+                // Initialize flyMap entry if it doesn't exist
+                Integer flyTicks = this.flyMap.getOrDefault(player, 0);
+                if (flyTicks > 1) {
+                    this.flyMap.put(player, flyTicks - 1);
+                } else if (flyTicks == 1) {
+                    if (!player.isCreative()) {
+                        player.getAbilities().mayfly = false;
+                        player.getAbilities().flying = false;
+                        player.onUpdateAbilities();
+                        player.addEffect(new MobEffectInstance(MobEffects.SLOW_FALLING, 200, 0, true, false));
+                    }
+                    this.flyMap.put(player, 0);
+                }
+            }
+        } catch (Exception ex) {
+            ex.printStackTrace();
+            this.flyMap.put(player, 0);
+        }
+    }
 
 	@Override
 	public void onUnequip(SlotContext context, ItemStack newStack, ItemStack stack) {
