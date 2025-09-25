@@ -34,25 +34,27 @@ public class EtheriumEventHandler {
 		this.etheriumOre = etheriumOre;
 	}
 
-	@SubscribeEvent
-	public void onEntityHurt(LivingHurtEvent event) {
-		if (event.getEntity() instanceof Player player && event.getAmount() > 0) {
-			/*
-			 * Handler for knockback feedback and damage reduction of Etherium Armor Shield.
-			 */
+    @SubscribeEvent
+    public void onEntityHurt(LivingHurtEvent event) {
+        if (event.getEntity() instanceof Player player && event.getAmount() > 0) {
+            /*
+             * Handler for knockback feedback and damage reduction of Etherium Armor Shield.
+             */
+            if (EtheriumArmor.hasShield(player)) {
+                // Check if the direct entity is a LivingEntity before casting
+                if (event.getSource().getDirectEntity() instanceof LivingEntity) {
+                    LivingEntity attacker = (LivingEntity) event.getSource().getDirectEntity();
+                    Vector3 vec = Vector3.fromEntityCenter(player).subtract(Vector3.fromEntityCenter(attacker)).normalize();
+                    attacker.knockback(0.75F, vec.x, vec.z);
+                    player.level().playSound(null, player.blockPosition(), this.config.getShieldTriggerSound(), SoundSource.PLAYERS, 1.0F, 0.9F + (float) (Math.random() * 0.1D));
+                    player.level().playSound(null, player.blockPosition(), this.config.getShieldTriggerSound(), SoundSource.PLAYERS, 1.0F, 0.9F + (float) (Math.random() * 0.1D));
+                }
 
-			if (EtheriumArmor.hasShield(player)) {
-				if (event.getSource().getDirectEntity() instanceof LivingEntity attacker) {
-					Vector3 vec = Vector3.fromEntityCenter(player).subtract(Vector3.fromEntityCenter(attacker)).normalize();
-					attacker.knockback(0.75F, vec.x, vec.z);
-					player.level().playSound(null, player.blockPosition(), this.config.getShieldTriggerSound(), SoundSource.PLAYERS, 1.0F, 0.9F + (float) (Math.random() * 0.1D));
-					player.level().playSound(null, player.blockPosition(), this.config.getShieldTriggerSound(), SoundSource.PLAYERS, 1.0F, 0.9F + (float) (Math.random() * 0.1D));
-				}
-
-				event.setAmount(event.getAmount() * this.config.getShieldReduction().asModifierInverted());
-			}
-		}
-	}
+                // Apply damage reduction regardless of attacker type
+                event.setAmount(event.getAmount() * this.config.getShieldReduction().asModifierInverted());
+            }
+        }
+    }
 
 	@SubscribeEvent
 	public void onEntityAttacked(LivingAttackEvent event) {
