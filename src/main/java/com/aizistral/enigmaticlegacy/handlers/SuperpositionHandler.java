@@ -1271,42 +1271,36 @@ public class SuperpositionHandler {
 		return destinationWorld;
 	}
 
-	public static DimensionalPosition getRespawnPoint(ServerPlayer serverPlayer) {
-		ResourceKey<Level> respawnDimension = AdvancedSpawnLocationHelper.getPlayerRespawnDimension(serverPlayer);
-		ServerLevel respawnWorld = SuperpositionHandler.getWorld(respawnDimension);
+    public static DimensionalPosition getRespawnPoint(ServerPlayer serverPlayer) {
+        ResourceKey<Level> respawnDimension = AdvancedSpawnLocationHelper.getPlayerRespawnDimension(serverPlayer);
+        ServerLevel respawnWorld = SuperpositionHandler.getWorld(respawnDimension);
+        Optional<Vec3> currentDimensionRespawnCoords = AdvancedSpawnLocationHelper.getValidSpawn(respawnWorld, serverPlayer);
+        Optional<Vec3> destinationDimensionRespawnCoords;
 
-		Optional<Vec3> currentDimensionRespawnCoords = AdvancedSpawnLocationHelper.getValidSpawn(respawnWorld, serverPlayer);
-		Optional<Vec3> destinationDimensionRespawnCoords;
+        ServerLevel destinationWorld = currentDimensionRespawnCoords.isPresent() ? respawnWorld : serverPlayer.serverLevel(); // Use death dimension as fallback
 
-		ServerLevel destinationWorld = currentDimensionRespawnCoords.isPresent() ? respawnWorld : serverPlayer.server.overworld();
+        if (!respawnWorld.equals(destinationWorld)) {
+            destinationDimensionRespawnCoords = AdvancedSpawnLocationHelper.getValidSpawn(destinationWorld, serverPlayer);
+        } else {
+            destinationDimensionRespawnCoords = Optional.empty();
+        }
 
-		if (!respawnWorld.equals(destinationWorld)) {
-			destinationDimensionRespawnCoords = AdvancedSpawnLocationHelper.getValidSpawn(destinationWorld, serverPlayer);
-		} else {
-			destinationDimensionRespawnCoords = Optional.empty();
-		}
+        Vec3 trueVec;
 
-		Vec3 trueVec;
+        if (currentDimensionRespawnCoords.isPresent()) {
+            trueVec = currentDimensionRespawnCoords.get();
+        } else if (destinationDimensionRespawnCoords.isPresent()) {
+            trueVec = destinationDimensionRespawnCoords.get();
+        } else {
+            // Use death location instead of world spawn
+            trueVec = new Vec3(serverPlayer.getX(), serverPlayer.getY(), serverPlayer.getZ());
+            while (!destinationWorld.getBlockState(BlockPos.containing(trueVec)).isAir() && trueVec.y < 255.0D) {
+                trueVec = trueVec.add(0, 1D, 0);
+            }
+        }
 
-		if (currentDimensionRespawnCoords.isPresent()) {
-			trueVec = currentDimensionRespawnCoords.get();
-		} else if (destinationDimensionRespawnCoords.isPresent()) {
-			trueVec = destinationDimensionRespawnCoords.get();
-		} else {
-			/*
-			 * TODO Spawning player at the world's center involves a lot of collision checks, which we can't do
-			 * without actually teleporting the player. Investigate on possible workarounds.
-			 */
-			trueVec = new Vec3(destinationWorld.getSharedSpawnPos().getX() + 0.5, destinationWorld.getSharedSpawnPos().getY() + 0.5, destinationWorld.getSharedSpawnPos().getZ() + 0.5);
-
-			while (!destinationWorld.getBlockState(BlockPos.containing(trueVec)).isAir() && trueVec.y < 255.0D) {
-				trueVec = trueVec.add(0, 1D, 0);
-			}
-
-		}
-
-		return new DimensionalPosition(trueVec.x, trueVec.y, trueVec.z, destinationWorld);
-	}
+        return new DimensionalPosition(trueVec.x, trueVec.y, trueVec.z, destinationWorld);
+    }
 
 	public static void removeAttributeMap(Player player, Multimap<Attribute, AttributeModifier> attributes) {
 		AttributeMap map = player.getAttributes();

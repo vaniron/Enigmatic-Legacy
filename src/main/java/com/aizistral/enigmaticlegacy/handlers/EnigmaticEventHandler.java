@@ -2706,41 +2706,52 @@ public class EnigmaticEventHandler {
 
 			DimensionalPosition dimPoint = hadEscapeScroll ? SuperpositionHandler.getRespawnPoint(player) : new DimensionalPosition(player.getX(), player.getY(), player.getZ(), player.level());
 
-			if (hadEscapeScroll) {
-				BlockPos respawnPos = player.getRespawnPosition();
-				ServerLevel respawnLevel = ServerLifecycleHooks.getCurrentServer().getLevel(player.getRespawnDimension());
-				boolean isEndAnchor = false;
+            if (hadEscapeScroll) {
+                BlockPos respawnPos = player.getRespawnPosition();
+                ServerLevel respawnLevel = ServerLifecycleHooks.getCurrentServer().getLevel(player.getRespawnDimension());
+                boolean isEndAnchor = false;
 
-				if (respawnLevel.getBlockState(respawnPos).is(EnigmaticBlocks.END_ANCHOR)) {
-					dimPoint = new DimensionalPosition(respawnPos.getX() + 0.5, respawnPos.getY() + 1.5,
-							respawnPos.getZ() + 0.5, respawnLevel);
-					isEndAnchor = true;
-				}
+                // If respawnPos is null, fall back to player's death location or world spawn
+                if (respawnPos == null || respawnLevel == null) {
+                    EnigmaticLegacy.LOGGER.warn("No respawn position set for player " + player.getGameProfile().getName() + ". Using death location as fallback.");
+                    dimPoint = new DimensionalPosition(player.getX(), player.getY(), player.getZ(), player.level());
+                } else if (respawnLevel.getBlockState(respawnPos).is(EnigmaticBlocks.END_ANCHOR)) {
+                    dimPoint = new DimensionalPosition(respawnPos.getX() + 0.5, respawnPos.getY() + 1.5,
+                            respawnPos.getZ() + 0.5, respawnLevel);
+                    isEndAnchor = true;
+                }
 
-				player.level().playSound(null, player.blockPosition(), SoundEvents.ENDERMAN_TELEPORT, SoundSource.PLAYERS, 1.0F, (float) (0.8F + (Math.random() * 0.2)));
-				EnigmaticLegacy.packetInstance.send(PacketDistributor.NEAR.with(() -> new PacketDistributor.TargetPoint(player.getX(), player.getY(), player.getZ(), 128, player.level().dimension())), new PacketPortalParticles(player.getX(), player.getY() + (player.getBbHeight() / 2), player.getZ(), 100, 1.25F, false));
+                // Ensure dimPoint.world is valid before proceeding
+                if (dimPoint.world == null) {
+                    EnigmaticLegacy.LOGGER.error("Invalid world for respawn dimension. Falling back to player's current world.");
+                    dimPoint = new DimensionalPosition(player.getX(), player.getY(), player.getZ(), player.level());
+                }
 
-				for (ItemEntity dropIt : event.getDrops()) {
-					ItemEntity alternativeDrop = new ItemEntity(dimPoint.world, dimPoint.posX, dimPoint.posY, dimPoint.posZ, dropIt.getItem());
-					alternativeDrop.teleportTo(dimPoint.posX, dimPoint.posY, dimPoint.posZ);
+                player.level().playSound(null, player.blockPosition(), SoundEvents.ENDERMAN_TELEPORT, SoundSource.PLAYERS, 1.0F, (float) (0.8F + (Math.random() * 0.2)));
+                EnigmaticLegacy.packetInstance.send(PacketDistributor.NEAR.with(() -> new PacketDistributor.TargetPoint(player.getX(), player.getY(), player.getZ(), 128, player.level().dimension())),
+                        new PacketPortalParticles(player.getX(), player.getY() + (player.getBbHeight() / 2), player.getZ(), 100, 1.25F, false));
 
-					if (!isEndAnchor) {
-						alternativeDrop.setDeltaMovement(THEY_SEE_ME_ROLLIN.nextDouble()-0.5, THEY_SEE_ME_ROLLIN.nextDouble()-0.5, THEY_SEE_ME_ROLLIN.nextDouble()-0.5);
-					} else {
-						alternativeDrop.setDeltaMovement(0, 0, 0);
-					}
+                for (ItemEntity dropIt : new ArrayList<>(event.getDrops())) { // Use a copy to avoid ConcurrentModificationException
+                    ItemEntity alternativeDrop = new ItemEntity(dimPoint.world, dimPoint.posX, dimPoint.posY, dimPoint.posZ, dropIt.getItem());
+                    alternativeDrop.teleportTo(dimPoint.posX, dimPoint.posY, dimPoint.posZ);
 
-					dimPoint.world.addFreshEntity(alternativeDrop);
-					dropIt.setItem(ItemStack.EMPTY);
-				}
+                    if (!isEndAnchor) {
+                        alternativeDrop.setDeltaMovement(THEY_SEE_ME_ROLLIN.nextDouble()-0.5, THEY_SEE_ME_ROLLIN.nextDouble()-0.5, THEY_SEE_ME_ROLLIN.nextDouble()-0.5);
+                    } else {
+                        alternativeDrop.setDeltaMovement(0, 0, 0);
+                    }
 
-				event.getDrops().clear();
+                    dimPoint.world.addFreshEntity(alternativeDrop);
+                    dropIt.setItem(ItemStack.EMPTY);
+                }
 
-				final DimensionalPosition dimPointFinal = dimPoint;
+                event.getDrops().clear();
 
-				dimPoint.world.playSound(null, BlockPos.containing(dimPoint.posX, dimPoint.posY, dimPoint.posZ), SoundEvents.ENDERMAN_TELEPORT, SoundSource.PLAYERS, 1.0F, (float) (0.8F + (Math.random() * 0.2)));
-				EnigmaticLegacy.packetInstance.send(PacketDistributor.NEAR.with(() -> new PacketDistributor.TargetPoint(dimPointFinal.posX, dimPointFinal.posY, dimPointFinal.posZ, 128, dimPointFinal.world.dimension())), new PacketRecallParticles(dimPoint.posX, dimPoint.posY, dimPoint.posZ, 48, false));
-			}
+                final DimensionalPosition dimPointFinal = dimPoint;
+                dimPoint.world.playSound(null, BlockPos.containing(dimPoint.posX, dimPoint.posY, dimPoint.posZ), SoundEvents.ENDERMAN_TELEPORT, SoundSource.PLAYERS, 1.0F, (float) (0.8F + (Math.random() * 0.2)));
+                EnigmaticLegacy.packetInstance.send(PacketDistributor.NEAR.with(() -> new PacketDistributor.TargetPoint(dimPointFinal.posX, dimPointFinal.posY, dimPointFinal.posZ, 128, dimPointFinal.world.dimension())),
+                        new PacketRecallParticles(dimPoint.posX, dimPoint.posY, dimPoint.posZ, 48, false));
+            }
 
 			if (this.hadEnigmaticAmulet(player) && !event.getDrops().isEmpty() && EnigmaticItems.ENIGMATIC_AMULET.isVesselEnabled()) {
 				ItemStack soulCrystal = SuperpositionHandler.canDropSoulCrystal(player, this.hadCursedRing(player)) ? EnigmaticItems.SOUL_CRYSTAL.createCrystalFrom(player) : null;
