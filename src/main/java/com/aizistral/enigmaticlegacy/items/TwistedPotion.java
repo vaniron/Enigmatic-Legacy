@@ -52,29 +52,47 @@ public class TwistedPotion extends ItemBasePotion implements ICursed {
 		ItemLoreHelper.indicateCursedOnesOnly(list);
 	}
 
-	@Override
-	public void onConsumed(Level worldIn, Player playerIn, ItemStack potion) {
-		if (playerIn instanceof ServerPlayer player) {
-			CompoundTag location = this.getLastDeathLocation(player);
+    @Override
+    public void onConsumed(Level worldIn, Player playerIn, ItemStack potion) {
+        if (playerIn instanceof ServerPlayer player) {
+            CompoundTag location = this.getLastDeathLocation(player);
 
-			if (location != null) {
-				double x = location.getDouble("x"), y = location.getDouble("y"), z = location.getDouble("z");
-				ResourceKey<Level> dimension = ResourceKey.create(Registries.DIMENSION, new ResourceLocation(location.getString("dimension")));
+            if (location != null) {
+                double x = location.getDouble("x");
+                double y = location.getDouble("y");
+                double z = location.getDouble("z");
+                ResourceKey<Level> dimension = ResourceKey.create(Registries.DIMENSION, new ResourceLocation(location.getString("dimension")));
 
-				player.level().playSound(null, player.blockPosition(), SoundEvents.ENDERMAN_TELEPORT, SoundSource.PLAYERS, 1.0F, (float) (0.8F + (Math.random() * 0.2)));
-				player.level().playSound(null, player.blockPosition(), SoundEvents.PLAYER_HURT, SoundSource.PLAYERS, 1, 1);
-				EnigmaticLegacy.packetInstance.send(PacketDistributor.NEAR.with(() -> new PacketDistributor.TargetPoint(player.getX(), player.getY(), player.getZ(), 128, player.level().dimension())), new PacketPortalParticles(player.getX(), player.getY() + (player.getBbHeight() / 2), player.getZ(), 100, 1.25F, false));
+                // Play sound and particles at the starting position
+                player.level().playSound(null, player.blockPosition(), SoundEvents.ENDERMAN_TELEPORT, SoundSource.PLAYERS, 1.0F, (float) (0.8F + (Math.random() * 0.2)));
+                player.level().playSound(null, player.blockPosition(), SoundEvents.PLAYER_HURT, SoundSource.PLAYERS, 1, 1);
+                ServerPlayer finalPlayer = player;
+                EnigmaticLegacy.packetInstance.send(PacketDistributor.NEAR.with(() -> new PacketDistributor.TargetPoint(finalPlayer.getX(), finalPlayer.getY(), finalPlayer.getZ(), 128, finalPlayer.level().dimension())), new PacketPortalParticles(player.getX(), player.getY() + (player.getBbHeight() / 2), player.getZ(), 100, 1.25F, false));
 
-				SuperpositionHandler.sendToDimension(player, dimension);
-				player.moveTo(x, y, z);
-				player.setHealth(1);
+                // Teleport to the correct dimension and position
+                if (!player.level().dimension().equals(dimension)) {
+                    // Ensure dimension switch before moving
+                    SuperpositionHandler.sendToDimension(player, dimension);
+                    // Refresh player reference after dimension switch
+                    player = (ServerPlayer) player.getServer().getPlayerList().getPlayer(player.getUUID());
+                    if (player == null) {
+                        // Handle rare case where player reference is lost
+                        return;
+                    }
+                }
 
-				player.level().playSound(null, player.blockPosition(), SoundEvents.ENDERMAN_TELEPORT, SoundSource.PLAYERS, 1.0F, (float) (0.8F + (Math.random() * 0.2)));
-				player.level().playSound(null, player.blockPosition(), SoundEvents.PLAYER_HURT, SoundSource.PLAYERS, 1, 1);
-				EnigmaticLegacy.packetInstance.send(PacketDistributor.NEAR.with(() -> new PacketDistributor.TargetPoint(player.getX(), player.getY(), player.getZ(), 128, player.level().dimension())), new PacketRecallParticles(player.getX(), player.getY() + (player.getBbHeight() / 2), player.getZ(), 48, false));
-			}
-		}
-	}
+                // Move to the exact coordinates in the correct dimension
+                player.teleportTo(x, y, z);
+                player.setHealth(1);
+
+                // Play sound and particles at the destination
+                player.level().playSound(null, player.blockPosition(), SoundEvents.ENDERMAN_TELEPORT, SoundSource.PLAYERS, 1.0F, (float) (0.8F + (Math.random() * 0.2)));
+                player.level().playSound(null, player.blockPosition(), SoundEvents.PLAYER_HURT, SoundSource.PLAYERS, 1, 1);
+                ServerPlayer finalPlayer1 = player;
+                EnigmaticLegacy.packetInstance.send(PacketDistributor.NEAR.with(() -> new PacketDistributor.TargetPoint(finalPlayer1.getX(), finalPlayer1.getY(), finalPlayer1.getZ(), 128, finalPlayer1.level().dimension())), new PacketRecallParticles(player.getX(), player.getY() + (player.getBbHeight() / 2), player.getZ(), 48, false));
+            }
+        }
+    }
 
 	@Override
 	public boolean canDrink(Level world, Player player, ItemStack potion) {
