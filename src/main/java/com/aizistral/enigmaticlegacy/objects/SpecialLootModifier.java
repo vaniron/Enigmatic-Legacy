@@ -75,12 +75,6 @@ public class SpecialLootModifier extends LootModifier {
 						SuperpositionHandler.setPersistentBoolean(player, "LootedArchitectEye", true);
 						generatedLoot.add(new ItemStack(EnigmaticItems.ENIGMATIC_EYE, 1));
 					}
-
-				if (SuperpositionHandler.hasPersistentTag(player, "LootedIchorBottle")) {
-					generatedLoot.removeIf(stack -> stack.is(EnigmaticItems.ICHOR_BOTTLE));
-				} else if (generatedLoot.stream().anyMatch(stack -> stack.is(EnigmaticItems.ICHOR_BOTTLE))) {
-					SuperpositionHandler.setPersistentBoolean(player, "LootedIchorBottle", true);
-				}
 			}
 
 			if (OmniconfigHandler.isItemEnabled(EnigmaticItems.ASTRAL_FRUIT))
